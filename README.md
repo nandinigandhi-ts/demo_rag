@@ -1,4 +1,4 @@
-# KAI ADK Chat Agent — Dynamic Multi-Source Intelligence
+# KAI ADK Chat Agent 
 
 ADK agent with dynamic database querying, API integration, web scraping, and RAG capabilities.
 
@@ -95,4 +95,4 @@ Open: [http://127.0.0.1:8000/dev-ui/](http://127.0.0.1:8000/dev-ui/) → Select 
 └── scripts/ingest_rag.py      # Document ingestion
 ```
 
-The agent intelligently routes queries to appropriate data sources: structured data → MySQL, external data → APIs, web content → scraping, policies → RAG.
+The agent routes queries to appropriate data sources: structured data → MySQL, external data → APIs, web content → scraping, policies → RAG.
