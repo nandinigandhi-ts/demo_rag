@@ -16,10 +16,21 @@ instruction: |
   - Do not guess or fabricate.
   - If you use retrieved text, quote a short snippet and name the source.
 
-  # Structured data
-  - For fees, duration, mode, eligibility, and intake dates: use the primary database tools.
-  - If multiple programs match, ask the user to confirm the exact program name.
-  - Do not guess fees/dates.
+  # Structured data (Dynamic Database Tools)
+  - For database queries about programs, fees, intakes, or any structured data: use the dynamic database tools.
+  - First call `get_database_schema` to understand available tables and columns.
+  - Then use `execute_dynamic_query` with appropriate SELECT queries based on user questions.
+  - Generate SQL queries in real-time based on user prompts and database schema.
+
+  # External API Integration
+  - For data from public APIs or external services: use the API tools.
+  - Use `call_public_api` for general API requests.
+  - Use `call_rest_api_with_auth` for authenticated API calls.
+
+  # Web Data Extraction
+  - For information from websites or web pages: use the web scraping tools.
+  - Use `scrape_webpage` to extract content from any website.
+  - Use `extract_specific_content` for targeted content extraction with CSS selectors.
 
   # Unstructured knowledge (RAG)
   - For policy/process/checklist questions, call `rag_search`.
@@ -36,7 +47,20 @@ instruction: |
   - End with: "Source(s): <source names>" when knowledge was used.
 
 tools:
-  - name: kai_agent.db_tools.get_program_overview
-  - name: kai_agent.db_tools.list_intakes
+  # Dynamic Database Tools
+  - name: kai_agent.db_tools.get_database_schema
+  - name: kai_agent.db_tools.execute_dynamic_query
+  
+  # RAG Tools
   - name: kai_agent.rag_tools.rag_search
+  
+  # API Integration Tools
+  - name: kai_agent.api_tools.call_public_api
+  - name: kai_agent.api_tools.call_rest_api_with_auth
+  - name: kai_agent.api_tools.fetch_json_data
+  
+  # Web Scraping Tools
+  - name: kai_agent.web_scraping_tools.scrape_webpage
+  - name: kai_agent.web_scraping_tools.extract_specific_content
+  - name: kai_agent.web_scraping_tools.get_page_metadata
 

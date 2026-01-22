@@ -1,181 +1,99 @@
-# KAI ADK Chat Agent — DB + RAG Connectors (Local)
+# KAI ADK Chat Agent — Dynamic Multi-Source Intelligence
 
-This repo demonstrates an ADK chat agent with:
+ADK agent with dynamic database querying, API integration, web scraping, and RAG capabilities.
 
-1. **Authenticated connector to a primary DB (MySQL)** for structured admissions data
-2. **Vector DB connector (Qdrant)** for RAG over admissions documents
+## Key Features
 
----
+### 🗄️ Dynamic MySQL Database Tools
+- **Schema discovery** - automatically understands database structure
+- **Real-time query generation** - converts natural language to SQL
+- Tools: `get_database_schema()`, `execute_dynamic_query()`
 
-## What’s implemented
+### 🌐 API Integration Tools  
+- **Public API connector** for external data sources
+- **Authentication support** for secured APIs
+- Tools: `call_public_api()`, `call_rest_api_with_auth()`, `fetch_json_data()`
 
-### Primary DB (MySQL) connector (auth)
+### 🕷️ Web Scraping Tools
+- **Website content extraction** with BeautifulSoup
+- **Targeted scraping** using CSS selectors  
+- Tools: `scrape_webpage()`, `extract_specific_content()`, `get_page_metadata()`
 
-* Safe, parameterized DB tools (no raw SQL from user input)
-* Example tools:
-
-  * `get_program_overview(program_name)`
-  * `list_intakes(program_name)`
-
-### Vector DB (Qdrant) connector for RAG
-
-* Document ingestion pipeline (chunk → embed → upsert into Qdrant)
-* Retrieval tool:
-
-  * `rag_search(query)` returns top chunks + sources
-
----
-
-## Prerequisites
-
-* Python 3.11+ (recommended)
-* Docker + Docker Compose
-* A Google GenAI API key (for embeddings)
+### 📚 Vector DB (Qdrant) for RAG
+- Document ingestion pipeline with embeddings
+- Tool: `rag_search()` returns chunks + sources
 
 ---
 
-## Repo layout
+## Quick Start
 
-```
-.
-├── agents/
-│   └── kai_agent/
-│       ├── root_agent.yaml
-│       ├── db_tools.py
-│       ├── rag_tools.py
-│       ├── rag_docs/
-│       │   ├── refund_policy.md
-│       │   ├── scholarships.md
-│       │   └── application_checklist.md
-│       └── .env                # gitignored
-├── scripts/
-│   └── ingest_rag.py
-├── docker-compose.yml
-├── .env                         # optional; gitignored
-├── .env.example
-├── requirements.txt
-└── README.md
-```
+### Prerequisites
+- Python 3.11+, Docker + Docker Compose
+- Google GenAI API key
 
----
-
-## Setup
-
-### 1) Environment variables
-
-Copy the template and fill in values:
-
+### Setup
 ```bash
+# 1. Environment 
 cp .env.example .env
-```
-
-Then edit `.env` and set:
-
-* `GOOGLE_API_KEY` (or `GEMINI_API_KEY`)
-* MySQL settings (match docker-compose defaults)
-* Qdrant settings
-
-For local ADK tool loading, copy env into the agent folder:
-
-```bash
+# Edit .env with your GOOGLE_API_KEY
 cp .env agents/kai_agent/.env
-```
 
----
-
-### 2) Start services (MySQL + Qdrant)
-
-```bash
+# 2. Services
 docker compose up -d
-```
 
-Optional health checks:
-
-```bash
-# Qdrant
-curl -s http://localhost:6333/collections
-
-# MySQL (inside container)
-docker exec -it kai-mysql mysql -uadmissions_user -padmissions_pw -D admissions \
-  -e "SELECT name, fee_usd FROM programs;"
-```
-
----
-
-### 3) Python dependencies
-
-```bash
+# 3. Dependencies
 python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-```
+pip install requests beautifulsoup4 lxml
 
----
-
-### 4) Ingest RAG documents into Qdrant
-
-```bash
-source .venv/bin/activate
+# 4. Ingest RAG documents
 python scripts/ingest_rag.py
-```
 
-You should see a message like:
-
-```
-✅ Ingested <N> chunks into Qdrant collection 'admissions_rag'
-```
-
----
-
-### 5) Run ADK
-
-Run from the **project root** (so the loader can find `agents/`):
-
-```bash
-source .venv/bin/activate
+# 5. Run agent
 adk web agents --port 8000
 ```
 
-Open the UI:
-
-* [http://127.0.0.1:8000/dev-ui/](http://127.0.0.1:8000/dev-ui/)
-
-Select `kai_agent` in the left dropdown.
+Open: [http://127.0.0.1:8000/dev-ui/](http://127.0.0.1:8000/dev-ui/) → Select `kai_agent`
 
 ---
 
-## Test prompts
+## Test Questions
 
-### DB (structured)
+**Database Queries:**
+- "What tables and columns are available in the database?"
+- "Show me all programs with their fees"
+- "Find the cheapest bootcamp program"
 
-* **What’s the fee and duration for Data Analytics Bootcamp?**
-* **List upcoming intakes for Data Analytics Bootcamp.**
+**API Integration:**
+- "Get a random cat fact from an API"
+- "Fetch current weather data for New York from a public API"
 
-Expected behavior:
+**Web Scraping:**  
+- "Scrape the main content from https://example.com"
+- "Get metadata from https://github.com"
 
-* Agent calls DB tools (`get_program_overview`, `list_intakes`)
-* Answers are grounded; Trace shows tool calls
+**Multi-Source:**
+- "Show me our programs, then check competitor pricing from their website"
 
-### RAG (unstructured)
-
-* **What’s the refund policy if I withdraw after 10 days?**
-* **What scholarship options are available and how long do decisions take?**
-* **What documents are required to apply?**
-
-Expected behavior:
-
-* Agent calls `rag_search`
-* Answers cite `Source(s): <filename>`
-
----
-
-## Notes
-
-* If RAG queries return empty results, re-run ingestion:
-
-  ```bash
-  python scripts/ingest_rag.py
-  ```
-* If ADK fails to load tools, check that `root_agent.yaml` only references modules that exist.
+**RAG Documents:**
+- "What's the refund policy if I withdraw after 10 days?"
+- "What scholarship options are available?"
 
 ---
+
+## Architecture
+
+```
+├── agents/kai_agent/
+│   ├── root_agent.yaml          # Agent configuration
+│   ├── db_tools.py             # Dynamic MySQL tools
+│   ├── api_tools.py            # API integration tools  
+│   ├── web_scraping_tools.py   # Web scraping tools
+│   ├── rag_tools.py            # Vector search tools
+│   └── rag_docs/               # Knowledge documents
+├── docker-compose.yml          # MySQL + Qdrant services
+└── scripts/ingest_rag.py      # Document ingestion
+```
+
+The agent intelligently routes queries to appropriate data sources: structured data → MySQL, external data → APIs, web content → scraping, policies → RAG.

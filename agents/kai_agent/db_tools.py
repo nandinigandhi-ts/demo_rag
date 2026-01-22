@@ -4,6 +4,8 @@ import os
 import mysql.connector
 from mysql.connector import Error
 import datetime as dt
+import re
+from typing import List, Dict, Any
 
 load_dotenv(Path(__file__).with_name(".env"), override=False)
 
@@ -18,6 +20,7 @@ def _get_conn():
     )
 
 def _json_safe_rows(rows: list[dict]) -> list[dict]:
+    """Convert datetime objects to ISO strings for JSON serialization."""
     out = []
     for r in rows:
         out.append({
@@ -26,55 +29,132 @@ def _json_safe_rows(rows: list[dict]) -> list[dict]:
         })
     return out
 
-def get_program_overview(program_name: str) -> dict:
-    """
-    Return structured info for a program.
-    This is a SAFE tool: parameterized query, limited fields, no raw SQL input.
-    """
-    if not program_name or not program_name.strip():
-        return {"status": "error", "message": "program_name is required"}
+def _sanitize_query(query: str) -> str:
+    """Basic query sanitization - remove dangerous SQL keywords."""
+    dangerous_keywords = [
+        'drop', 'delete', 'truncate', 'alter', 'create', 'insert', 'update',
+        'grant', 'revoke', 'exec', 'execute', 'xp_', 'sp_', 'union', '--', ';'
+    ]
+    
+    query_lower = query.lower()
+    for keyword in dangerous_keywords:
+        if keyword in query_lower:
+            raise ValueError(f"Dangerous SQL keyword '{keyword}' detected in query")
+    
+    return query.strip()
 
-    q = """
-        SELECT program_id, name, mode, duration_weeks, fee_usd, eligibility
-        FROM programs
-        WHERE name LIKE %s
-        LIMIT 3
+def get_database_schema() -> dict:
+    """
+    Retrieve the database schema including tables, columns, and relationships.
+    This helps the agent understand the database structure for dynamic query generation.
     """
     try:
         conn = _get_conn()
         cur = conn.cursor(dictionary=True)
-        cur.execute(q, (f"%{program_name.strip()}%",))
-        rows = cur.fetchall()
+        
+        # Get tables and their columns
+        schema_query = """
+        SELECT 
+            TABLE_NAME,
+            COLUMN_NAME,
+            DATA_TYPE,
+            IS_NULLABLE,
+            COLUMN_KEY,
+            COLUMN_COMMENT
+        FROM information_schema.COLUMNS
+        WHERE TABLE_SCHEMA = %s
+        ORDER BY TABLE_NAME, ORDINAL_POSITION
+        """
+        
+        cur.execute(schema_query, (os.getenv("MYSQL_DB", "admissions"),))
+        schema_rows = cur.fetchall()
+        
+        # Get foreign key relationships
+        fk_query = """
+        SELECT 
+            TABLE_NAME,
+            COLUMN_NAME,
+            REFERENCED_TABLE_NAME,
+            REFERENCED_COLUMN_NAME
+        FROM information_schema.KEY_COLUMN_USAGE
+        WHERE TABLE_SCHEMA = %s AND REFERENCED_TABLE_NAME IS NOT NULL
+        """
+        
+        cur.execute(fk_query, (os.getenv("MYSQL_DB", "admissions"),))
+        fk_rows = cur.fetchall()
+        
         cur.close()
         conn.close()
-        return {"status": "ok", "results": _json_safe_rows(rows)}
-    
+        
+        # Organize schema by tables
+        tables = {}
+        for row in schema_rows:
+            table_name = row['TABLE_NAME']
+            if table_name not in tables:
+                tables[table_name] = {'columns': [], 'foreign_keys': []}
+            
+            tables[table_name]['columns'].append({
+                'name': row['COLUMN_NAME'],
+                'type': row['DATA_TYPE'],
+                'nullable': row['IS_NULLABLE'] == 'YES',
+                'key': row['COLUMN_KEY'],
+                'comment': row['COLUMN_COMMENT']
+            })
+        
+        # Add foreign key information
+        for fk in fk_rows:
+            table_name = fk['TABLE_NAME']
+            if table_name in tables:
+                tables[table_name]['foreign_keys'].append({
+                    'column': fk['COLUMN_NAME'],
+                    'references_table': fk['REFERENCED_TABLE_NAME'],
+                    'references_column': fk['REFERENCED_COLUMN_NAME']
+                })
+        
+        return {"status": "ok", "schema": tables}
+        
     except Error as e:
         return {"status": "error", "message": f"MySQL error: {str(e)}"}
 
-def list_intakes(program_name: str) -> dict:
+def execute_dynamic_query(user_query: str, natural_language_description: str) -> dict:
     """
-    List upcoming intakes for a given program name (safe, parameterized).
+    Execute a dynamically generated MySQL query based on user input.
+    This replaces the hardcoded query functions with flexible SQL generation.
+    
+    Args:
+        user_query: The SQL query to execute (should be SELECT only)
+        natural_language_description: Human description of what the query does
     """
-    if not program_name or not program_name.strip():
-        return {"status": "error", "message": "program_name is required"}
-
-    q = """
-        SELECT p.name AS program_name, i.intake_name, i.start_date, i.application_deadline, i.seats, i.timezone
-        FROM intakes i
-        JOIN programs p ON p.program_id = i.program_id
-        WHERE p.name LIKE %s
-        ORDER BY i.start_date ASC
-        LIMIT 10
-    """
+    if not user_query or not user_query.strip():
+        return {"status": "error", "message": "Query is required"}
+    
     try:
+        # Sanitize the query
+        sanitized_query = _sanitize_query(user_query)
+        
+        # Ensure it's a SELECT query only
+        if not sanitized_query.lower().strip().startswith('select'):
+            return {"status": "error", "message": "Only SELECT queries are allowed"}
+        
+        # Limit results to prevent overwhelming responses
+        if 'limit' not in sanitized_query.lower():
+            sanitized_query += " LIMIT 50"
+        
         conn = _get_conn()
         cur = conn.cursor(dictionary=True)
-        cur.execute(q, (f"%{program_name.strip()}%",))
+        cur.execute(sanitized_query)
         rows = cur.fetchall()
         cur.close()
         conn.close()
-
-        return {"status": "ok", "results": _json_safe_rows(rows)}
+        
+        return {
+            "status": "ok", 
+            "results": _json_safe_rows(rows),
+            "query_description": natural_language_description,
+            "rows_returned": len(rows)
+        }
+        
+    except ValueError as ve:
+        return {"status": "error", "message": f"Query validation error: {str(ve)}"}
     except Error as e:
         return {"status": "error", "message": f"MySQL error: {str(e)}"}
