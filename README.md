@@ -4,22 +4,22 @@ ADK agent with dynamic database querying, API integration, web scraping, and RAG
 
 ## Key Features
 
-### 🗄️ Dynamic MySQL Database Tools
+### Dynamic MySQL Database Tools
 - **Schema discovery** - automatically understands database structure
 - **Real-time query generation** - converts natural language to SQL
 - Tools: `get_database_schema()`, `execute_dynamic_query()`
 
-### 🌐 API Integration Tools  
+### API Integration Tools  
 - **Public API connector** for external data sources
 - **Authentication support** for secured APIs
 - Tools: `call_public_api()`, `call_rest_api_with_auth()`, `fetch_json_data()`
 
-### 🕷️ Web Scraping Tools
+### Web Scraping Tools
 - **Website content extraction** with BeautifulSoup
 - **Targeted scraping** using CSS selectors  
 - Tools: `scrape_webpage()`, `extract_specific_content()`, `get_page_metadata()`
 
-### 📚 Vector DB (Qdrant) for RAG
+### Vector DB (Qdrant) for RAG
 - Document ingestion pipeline with embeddings
 - Tool: `rag_search()` returns chunks + sources
 
@@ -44,7 +44,7 @@ docker compose up -d
 # 3. Dependencies
 python -m venv .venv
 source .venv/bin/activate
-pip install -r requirements.txt
+pip install google-adk mysql-connector-python python-dotenv qdrant-client
 pip install requests beautifulsoup4 lxml
 
 # 4. Ingest RAG documents
@@ -67,7 +67,6 @@ Open: [http://127.0.0.1:8000/dev-ui/](http://127.0.0.1:8000/dev-ui/) → Select 
 
 **API Integration:**
 - "Get a random cat fact from an API"
-- "Fetch current weather data for New York from a public API"
 
 **Web Scraping:**  
 - "Scrape the main content from https://example.com"
